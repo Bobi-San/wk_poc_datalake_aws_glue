@@ -4,7 +4,7 @@ https://github.com/CodeFactoryBerlin/OpenSourceRepoTemplate
 
 # Basic Folder Structure
 
-    **src** : Source code folder
+    __src__ : Source code folder
     **test** : Unit tests and integration tests
     **.config** : It should local configuration related to setup on local machine.
     **.build** : This folder should contain all scripts related to build process (PowerShell, Docker compose…).
