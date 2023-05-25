@@ -1,0 +1,289 @@
+# =============================================================================
+Tags: 
+    Each object in AWS shall have a defined set of mandatory Tags.
+    Those will come handy when aggregating costs for internal charge back.
+# =============================================================================
+
+    Key	Value
+    App	application
+    CC	cost center
+    Env	environment code (dev, int,...)
+    Org	organization
+
+
+# =============================================================================
+IAM: For purposes of POC, used admin user
+# =============================================================================
+
+User name: user-admin-01
+
+Group name: Administrators
+    Permissions:
+        Policy name: AdministratorAccess
+        Type: AWS managed - job function	
+        Description: Provides full access to AWS services and resources
+
+        Policy name: AWSLakeFormationDataAdmin
+        Type: AWS managed	
+        Description: Grants administrative access to AWS Lake Formation and related services, such as AWS Glue, to manage data lakes
+
+Roles:
+    Role name: wk-xdp-datalake-s3-trigger-lambda-role
+        Permissions:
+            Policy name: wk-xdp-datalake-s3-trigger
+
+    Role name: AWSGlueServiceRole-Crawler-S3
+        Permissions:
+            Policy name: AWSGlueServiceRole
+            Type: AWS managed	
+            Description: Policy for AWS Glue service role which allows access to related services including EC2, S3, and Cloudwatch Logs
+
+            Policy name: AmazonS3FullAccess
+            Type: AWS managed	
+            Description: Provides full access to all buckets via the AWS Management Console
+
+            Policy name: AWSGlueServiceRole-Crawler-S3-EZCRC-s3Policy
+            Type: Customer managed
+            Description: his policy will be used for Glue Crawler and Job execution. Please do NOT delete!
+
+
+    Role name: 
+        Permissions:
+            Policy name: 
+            Type: AWS managed	
+            Description: 
+
+Policies:
+    Policy name: wk-xdp-datalake-s3-trigger
+    Type: Customer managed
+    Description: Grants AWS Lambda Function permission to list,read,write the Data Lake bucket as well as write logs to AWS CloudWatch
+    Policy JSON:
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "VisualEditor0",
+                    "Effect": "Allow",
+                    "Action": [
+                        "logs:CreateLogStream",
+                        "kms:Decrypt",
+                        "s3:ListBucket",
+                        "logs:CreateLogGroup",
+                        "logs:PutLogEvents"
+                    ],
+                    "Resource": [
+                        "arn:aws:s3:::rgi-sandbox-repo-dev",
+                        "arn:aws:logs:*:*:*",
+                        "arn:aws:kms:*:<aws-account>:key/*"
+                    ]
+                },
+                {
+                    "Sid": "VisualEditor1",
+                    "Effect": "Allow",
+                    "Action": [
+                        "s3:PutObject",
+                        "s3:GetObject",
+                        "s3:DeleteObject",
+                        "s3:GetObjectTagging",
+                        "s3:PutObjectTagging"
+                    ],
+                    "Resource": "arn:aws:s3:::rgi-sandbox-repo-dev/*"
+                },
+                {
+                    "Sid": "VisualEditor2",
+                    "Effect": "Allow",
+                    "Action": "ssm:GetParameter",
+                    "Resource": "arn:aws:ssm:*:<aws-account>:parameter/*"
+                }
+            ]
+        }
+
+    Policy name: AWSGlueServiceRole-Crawler-S3-EZCRC-s3Policy
+    Type: Customer managed
+    Description: his policy will be used for Glue Crawler and Job execution. Please do NOT delete!
+    Policy JSON:
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "s3:GetObject",
+                        "s3:PutObject"
+                    ],
+                    "Resource": [
+                        "arn:aws:s3:::rgi-sandbox-repo-dev/DataLakeV1/Bronze/Validated/Jenji/v1/*"
+                    ]
+                }
+            ]
+        }
+
+
+# =============================================================================
+Simple Systems Manager/Parameter Store: 
+# =============================================================================
+
+My parameters:
+    Name: /datalake/bronze/source_id-list
+        Value: Jenji,CardPro
+        Description: List of the Data Lake Bronze Layer Sourced Id
+
+
+# =============================================================================
+S3: Bucket name: wk-xdp-datalake-dev
+# =============================================================================
+
+# Event notifications
+    General configuration
+        Prefix: DataLakeV1/ArrivalHub/Delivered/
+        Suffix: <None>
+    Event types:
+        Object creation: All object create events
+    Destination:
+        Lambda function: wk-xdp-datalake-dlv-s3-trigger
+
+
+# Folder structure
+    DataLakeV1
+    ├── AWS
+    │   ├── Athena
+    │   │   └── QueryResults
+    │   │       └── Unsaved
+    │   └── Glue
+    │       ├── Assets
+    │       │   └── Scripts
+    │       ├── SparkHistoryLogs
+    │       └── Temporary
+    ├── ArrivalHub
+    │   ├── Delivered
+    │   │   ├── CardPro
+    │   │   └── Jenji
+    │   ├── PendingSelection
+    │   │   ├── CardPro
+    │   │   └── Jenji
+    │   ├── PendingValidations
+    │   │   ├── CardPro
+    │   │   └── Jenji
+    │   ├── Rejected
+    │   │   ├── CardPro
+    │   │   ├── Jenji
+    │   │   └── Unknown
+    │   └── Validated
+    │       ├── CardPro
+    │       │   └── v1
+    │       └── Jenji
+    │           └── v1
+    ├── Bronze
+    │   ├── RawData
+    │   │   ├── CardPro
+    │   │   │   └── dlv_dt=20230503
+    │   │   └── Jenji
+    │   │       └── dlv_dt=20230503
+    │   ├── RejectedData
+    │   │   └── txn_dt=20230503
+    │   └── ValidatedData
+    │       └── txn_dt=20230503
+    ├── Gold
+    │   └── Transaction
+    │       └── GlobalReport
+    │           └── v1
+    └── Silver
+        └── Transaction
+            ├── CardPro
+            │   └── v1
+            ├── Jenji
+            │   └── v1
+            ├── Rejected
+            │   └── v1
+            └── Unified
+                └── v1
+
+
+# =============================================================================
+Lambda: wk-xdp-datalake-dlv-s3-trigger
+# =============================================================================
+
+Permissions:
+    Triggers:
+        Trigger:
+            s3:::rgi-sandbox-repo-dev
+    Permissions:
+        Execution role: wk-xdp-datalake-s3-trigger-lambda-role
+        Resource summary: AWS-KMS: Allow: kms:Decrypt
+
+
+
+# =============================================================================
+Glue:
+# =============================================================================
+Data Catalog - Databases:
+    Name: wk-glue-data-catalog-arrivalhub
+    Location URI: s3://rgi-sandbox-repo-dev/DataLakeV1/ArrivalHub/
+    Description:
+        Staging area for incoming raw data deliveries before moving the original as well as the validated rows into Bronze. The rejected rows will remain into this staging area for troubleshooting and requesting a data fix at source. This was voluntarily separated from Bronze to abstract the delivery and better orcherstrate the part Source to Bronze, also rejected files may not be schemable and will require an Ad-Hoc inspection.
+	
+    Name: wk-glue-data-catalog-bronze
+    Location URI: s3://rgi-sandbox-repo-dev/DataLakeV1/Bronze/
+    Description:
+        AWS Glue Data Catalog for the Data Lake Bronze Layer - Raw Data
+
+    Name: wk-glue-data-catalog-silver
+    Location URI: s3://rgi-sandbox-repo-dev/DataLakeV1/Silver/
+    Description:
+        AWS Glue Data Catalog for the Data Lake Silver Layer - Standardized Data
+
+    Name: wk-glue-data-catalog-gold
+    Location URI: s3://rgi-sandbox-repo-dev/DataLakeV1/Gold/
+    Description:
+        AWS Glue Data Catalog for the Data Lake Gold Layer - Insights and Reporting
+
+
+Crawlers:
+    Name: wk-glue-crawler-arrivalhub-pendval-jenji
+    IAM role: AWSGlueServiceRole-Crawler-S3
+    Database: wk-glue-data-catalog-arrivalhub
+    Description: AWS Glue Data Crawler for the Data Lake Pre Bronze Layer - Raw Data - Pending Validations
+    Table prefix: tb_transaction_raw_pendval_
+    Data sources: s3://rgi-sandbox-repo-dev/DataLakeV1/ArrivalHub/PendingValidations/Jenji/
+    Schedule: On demand
+
+    Name: wk-glue-crawler-bronze-pendval-jenji
+    Data sources: s3://rgi-sandbox-repo-dev/DataLakeV1/ArrivalHub/PendingValidations/Jenji/
+        Crawl all sub-folders
+        Sample only a subset of files, Sample size = 1
+    Schedule: On demand
+
+ 
+Data Catalog - Tables:
+    Name: tb_transaction_raw_pendval_jenji
+    Database: wk-glue-data-catalog-arrivalhub
+    Location: s3://rgi-sandbox-repo-dev/DataLakeV1/ArrivalHub/PendingValidations/Jenji/
+    Classification: json
+    Note: Schema created first before running any jobs
+
+    Name: tb_transaction_raw_valid_jenji_v1
+    Database: wk-glue-data-catalog-arrivalhub
+    Location: s3://rgi-sandbox-repo-dev/DataLakeV1/ArrivalHub/Validated/Jenji/v1/
+    Classification: parquet
+    Note: Schema created by Glue job
+
+ETL Jobs:
+    Job name: wk-glue-job-bronze-mvsel2val-jenji-v1.py
+    Type: Python Shell
+    
+    Job name: wk-glue-job-bronze-ok-nok-jenji-v1
+    Type: Glue ETL
+
+
+# =============================================================================
+Athena: uses Glue Data Catalog
+# =============================================================================
+Queries:
+    -- Show first 10
+    SELECT * FROM "wk-glue-data-catalog-arrivalhub"."tb_transaction_raw_valid_jenji_v1" limit 10;
+
+    -- Will not work
+    SELECT sum(total) as sum_total_amt FROM "wk-glue-data-catalog-arrivalhub"."tb_transaction_raw_valid_jenji_v1"; 
+
+    -- Will work
+    SELECT sum(cast(total as real)) as sum_total_amt FROM "wk-glue-data-catalog-arrivalhub"."tb_transaction_raw_valid_jenji_v1;
